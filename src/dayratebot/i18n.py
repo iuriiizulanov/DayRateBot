@@ -3,16 +3,15 @@ from typing import Any
 
 _TRANSLATIONS: dict[str, dict[str, str]] = {
     "en": {
-        "day_today": "Today",
-        "day_yesterday": "Yesterday",
-        "more_commands": "Other commands",
+        "day_today": "📅 Today",
+        "day_yesterday": "🗓 Yesterday",
+        "more_commands": "☰ Other commands",
         "menu_prompt": "Choose a command:",
-        "menu_history": "History",
-        "menu_chart": "Chart",
-        "menu_timezone": "Timezone",
-        "menu_help": "Help",
-        "menu_cancel": "Cancel comment",
-        "menu_back": "Back",
+        "menu_history": "📚 History",
+        "menu_chart": "📈 Chart",
+        "menu_timezone": "🌍 Timezone",
+        "menu_help": "ℹ️ Help",
+        "menu_back": "↩️ Back",
         "help_scale": (
             "How to rate your day (1–10):\n"
             "1–2 — very difficult day\n"
@@ -23,7 +22,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
             "Use the score that best reflects how you personally feel. "
             "There are no right or wrong answers."
         ),
-        "add_comment": "Add a comment",
+        "add_comment": "💬 Add a comment",
         "welcome": (
             "Hi! This bot helps you:\n"
             "• rate today or yesterday from 1 to 10\n"
@@ -97,16 +96,15 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "chart_no_ratings": "No ratings yet",
     },
     "ru": {
-        "day_today": "Сегодня",
-        "day_yesterday": "Вчера",
-        "more_commands": "Другие команды",
+        "day_today": "📅 Сегодня",
+        "day_yesterday": "🗓 Вчера",
+        "more_commands": "☰ Другие команды",
         "menu_prompt": "Выберите команду:",
-        "menu_history": "История",
-        "menu_chart": "График",
-        "menu_timezone": "Часовой пояс",
-        "menu_help": "Помощь",
-        "menu_cancel": "Отменить комментарий",
-        "menu_back": "Назад",
+        "menu_history": "📚 История",
+        "menu_chart": "📈 График",
+        "menu_timezone": "🌍 Часовой пояс",
+        "menu_help": "ℹ️ Помощь",
+        "menu_back": "↩️ Назад",
         "help_scale": (
             "Как оценить свой день по шкале от 1 до 10:\n"
             "1–2 — очень тяжёлый день\n"
@@ -117,7 +115,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
             "Выбирайте оценку по своим ощущениям. Правильных или неправильных "
             "ответов нет."
         ),
-        "add_comment": "Добавить комментарий",
+        "add_comment": "💬 Добавить комментарий",
         "welcome": (
             "Привет! Этот бот поможет тебе:\n"
             "• оценить сегодня или вчера по 10-балльной шкале\n"

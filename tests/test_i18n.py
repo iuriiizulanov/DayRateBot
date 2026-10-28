@@ -17,7 +17,7 @@ def test_unsupported_and_missing_languages_use_english() -> None:
     assert get_locale("en") == "en"
     assert get_locale("fr") == "en"
     assert get_locale(None) == "en"
-    assert translate(get_locale("fr"), "day_today") == "Today"
+    assert translate(get_locale("fr"), "day_today") == "📅 Today"
 
 
 def test_default_metric_name_is_localized() -> None:

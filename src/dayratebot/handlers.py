@@ -44,18 +44,13 @@ def _day_keyboard(locale: str) -> ReplyKeyboardMarkup:
 def _commands_keyboard(locale: str) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [
-                KeyboardButton(text=translate(locale, "menu_history")),
-                KeyboardButton(text=translate(locale, "menu_chart")),
-            ],
+            [KeyboardButton(text=translate(locale, "menu_history"))],
+            [KeyboardButton(text=translate(locale, "menu_chart"))],
             [
                 KeyboardButton(text=translate(locale, "menu_timezone")),
                 KeyboardButton(text=translate(locale, "menu_help")),
             ],
-            [
-                KeyboardButton(text=translate(locale, "menu_cancel")),
-                KeyboardButton(text=translate(locale, "menu_back")),
-            ],
+            [KeyboardButton(text=translate(locale, "menu_back"))],
         ],
         resize_keyboard=True,
     )
@@ -81,7 +76,7 @@ def _metric_keyboard(metrics: list, rated_for: date, locale: str) -> InlineKeybo
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=metric_name(metric, locale),
+                    text=f"⭐ {metric_name(metric, locale)}",
                     callback_data=f"metric:{metric['id']}:{rated_for.isoformat()}",
                 )
             ]
@@ -97,7 +92,7 @@ def _metric_action_keyboard(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=metric_name(metric, locale),
+                    text=f"⭐ {metric_name(metric, locale)}",
                     callback_data=f"{action}:{metric['id']}",
                 )
             ]
@@ -537,7 +532,7 @@ async def chart_for_metric(callback: CallbackQuery, database: Database) -> None:
 
 @router.message(F.text.in_(_MENU_BUTTON_LABELS))
 async def handle_menu_button(
-    message: Message, database: Database, state: FSMContext
+    message: Message, database: Database
 ) -> None:
     locale = get_locale(message.from_user.language_code)
     text = message.text
@@ -566,8 +561,6 @@ async def handle_menu_button(
         await _show_timezone_prompt(message, database, locale)
     elif text == translate(locale, "menu_help"):
         await show_help(message)
-    elif text == translate(locale, "menu_cancel"):
-        await cancel_comment(message, state)
     elif text == translate(locale, "menu_back"):
         await message.answer(
             translate(locale, "rate_prompt"),

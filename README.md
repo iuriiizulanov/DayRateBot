@@ -39,8 +39,8 @@ Set a timezone with, for example, `/timezone Europe/London`.
 - `/cancel` — cancel comment entry.
 
 The main keyboard has **Today**, **Yesterday**, and **Other commands** buttons.
-The additional menu contains History, Chart, Timezone, Help, Cancel comment,
-and Back.
+The additional menu contains History, Chart, Timezone, Help, and Back. Use
+`/cancel` to cancel comment entry.
 
 ## Architecture
 
