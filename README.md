@@ -19,7 +19,7 @@ and reviewing personal statistics.
 
 ## Getting started
 
-Python 3.11 or newer is required.
+Python 3.10 or newer is required.
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and get its token.
 2. Copy `.env.example` to `.env` and set `BOT_TOKEN`.
@@ -80,7 +80,7 @@ Telegram-бот для оценки сегодняшнего или вчераш
 
 ### Запуск
 
-Требуется Python 3.11 или новее.
+Требуется Python 3.10 или новее.
 
 1. Создайте бота через [@BotFather](https://t.me/BotFather) и получите токен.
 2. Скопируйте `.env.example` в `.env` и задайте `BOT_TOKEN`.
