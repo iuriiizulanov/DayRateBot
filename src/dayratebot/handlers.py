@@ -28,24 +28,78 @@ class CommentForm(StatesGroup):
     waiting_for_comment = State()
 
 
-def _day_keyboard(locale: str) -> ReplyKeyboardMarkup:
+class NoteForm(StatesGroup):
+    waiting_for_note = State()
+
+
+def _day_button_text(locale: str, key: str, score: int | None = None) -> str:
+    label = translate(locale, key)
+    if score is None:
+        return label
+    color = "🔴" if score <= 4 else "🟡" if score <= 6 else "🟢"
+    return f"{label} - {color} {score}"
+
+
+def _day_button_labels(locale: str, key: str) -> set[str]:
+    return {
+        _day_button_text(locale, key, score)
+        for score in range(1, 11)
+    } | {translate(locale, key)}
+
+
+def _day_keyboard(
+    locale: str,
+    today_score: int | None = None,
+    yesterday_score: int | None = None,
+) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text=translate(locale, "day_today")),
-                KeyboardButton(text=translate(locale, "day_yesterday")),
+                KeyboardButton(
+                    text=_day_button_text(locale, "day_yesterday", yesterday_score)
+                ),
+                KeyboardButton(text=_day_button_text(locale, "day_today", today_score)),
             ],
-            [KeyboardButton(text=translate(locale, "more_commands"))],
+            [
+                KeyboardButton(text=translate(locale, "note_today")),
+                KeyboardButton(text=translate(locale, "more_commands")),
+            ],
         ],
         resize_keyboard=True,
     )
 
 
+async def _day_keyboard_for_user(
+    database: Database, user_id: int, locale: str
+) -> ReplyKeyboardMarkup:
+    today = await _local_today(database, user_id)
+    metric = next(
+        (
+            item
+            for item in await database.list_metrics()
+            if item["code"] == "day_rating"
+        ),
+        None,
+    )
+    scores: list[int | None] = [None, None]
+    if metric is not None:
+        for offset in range(2):
+            rating = await database.get_rating(
+                user_id, int(metric["id"]), today - timedelta(days=offset)
+            )
+            if rating is not None:
+                scores[offset] = int(rating["score"])
+    return _day_keyboard(locale, *scores)
+
+
 def _commands_keyboard(locale: str) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=translate(locale, "menu_history"))],
-            [KeyboardButton(text=translate(locale, "menu_chart"))],
+            [
+                KeyboardButton(text=translate(locale, "menu_history")),
+                KeyboardButton(text=translate(locale, "menu_chart")),
+            ],
+            [KeyboardButton(text=translate(locale, "menu_delete_note"))],
             [
                 KeyboardButton(text=translate(locale, "menu_timezone")),
                 KeyboardButton(text=translate(locale, "menu_help")),
@@ -59,16 +113,29 @@ def _commands_keyboard(locale: str) -> ReplyKeyboardMarkup:
 _MENU_BUTTON_KEYS = (
     "day_today",
     "day_yesterday",
+    "note_today",
     "more_commands",
     "menu_history",
     "menu_chart",
+    "menu_delete_note",
     "menu_timezone",
     "menu_help",
     "menu_back",
 )
+_NOTE_BUTTON_LABELS = {
+    translate(locale, "note_today") for locale in ("en", "ru")
+} | {"📝 Note today", "📝 Заметка сегодня"}
+_MORE_BUTTON_LABELS = {
+    translate(locale, "more_commands") for locale in ("en", "ru")
+} | {"☰ Other commands", "☰ Другие команды"}
 _MENU_BUTTON_LABELS = {
     translate(locale, key) for locale in ("en", "ru") for key in _MENU_BUTTON_KEYS
-}
+} | {
+    label
+    for locale in ("en", "ru")
+    for key in ("day_today", "day_yesterday")
+    for label in _day_button_labels(locale, key)
+} | _NOTE_BUTTON_LABELS | _MORE_BUTTON_LABELS
 
 
 def _metric_keyboard(metrics: list, rated_for: date, locale: str) -> InlineKeyboardMarkup:
@@ -128,6 +195,32 @@ def _comment_keyboard(rating_id: int, locale: str) -> InlineKeyboardMarkup:
     )
 
 
+def _delete_note_keyboard(notes: list, locale: str) -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(
+            text=translate(
+                locale,
+                "delete_note_date",
+                date=date.fromisoformat(note["note_for"]).strftime("%d.%m.%Y"),
+            ),
+            callback_data=f"delete_note:{note['note_for']}",
+        )
+        for note in notes
+    ]
+    rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _note_prompt(locale: str, prompt_key: str, current_note: str | None) -> str:
+    prompt = translate(locale, prompt_key, limit=COMMENT_LIMIT)
+    if current_note is None:
+        return prompt
+    return (
+        f"{translate(locale, 'current_note', note=current_note)}\n\n"
+        f"{prompt}"
+    )
+
+
 async def _local_today(database: Database, user_id: int) -> date:
     timezone = await database.get_timezone(user_id)
     return datetime.now(ZoneInfo(timezone)).date()
@@ -139,7 +232,9 @@ async def start(message: Message, database: Database) -> None:
     locale = get_locale(message.from_user.language_code)
     await message.answer(
         translate(locale, "welcome"),
-        reply_markup=_day_keyboard(locale),
+        reply_markup=await _day_keyboard_for_user(
+            database, message.from_user.id, locale
+        ),
     )
 
 
@@ -149,7 +244,9 @@ async def rate(message: Message, database: Database) -> None:
     locale = get_locale(message.from_user.language_code)
     await message.answer(
         translate(locale, "rate_prompt"),
-        reply_markup=_day_keyboard(locale),
+        reply_markup=await _day_keyboard_for_user(
+            database, message.from_user.id, locale
+        ),
     )
 
 
@@ -305,21 +402,42 @@ async def request_comment(
     await callback.answer()
     locale = get_locale(callback.from_user.language_code)
     rating_id = int(callback.data.split(":")[1])
-    if await database.get_rating_owner(rating_id, callback.from_user.id) is None:
+    rating = await database.get_rating_owner(rating_id, callback.from_user.id)
+    if rating is None:
         await callback.message.answer(translate(locale, "rating_not_found"))
         return
+    current_note = await database.get_daily_note(
+        callback.from_user.id, date.fromisoformat(rating["rated_for"])
+    )
     await state.update_data(rating_id=rating_id)
     await state.set_state(CommentForm.waiting_for_comment)
     await callback.message.answer(
-        translate(locale, "comment_prompt", limit=COMMENT_LIMIT)
+        _note_prompt(locale, "comment_prompt", current_note)
+    )
+
+
+@router.callback_query(F.data.startswith("delete_note:"))
+async def delete_note(callback: CallbackQuery, database: Database) -> None:
+    await callback.answer()
+    locale = get_locale(callback.from_user.language_code)
+    note_for = date.fromisoformat(callback.data.split(":", maxsplit=1)[1])
+    deleted = await database.delete_daily_note(callback.from_user.id, note_for)
+    await callback.message.answer(
+        translate(locale, "note_deleted" if deleted else "note_not_found")
     )
 
 
 @router.message(Command("cancel"))
 async def cancel_comment(message: Message, state: FSMContext) -> None:
+    state_name = await state.get_state()
     await state.clear()
     locale = get_locale(message.from_user.language_code)
-    await message.answer(translate(locale, "comment_cancelled"))
+    message_key = (
+        "note_cancelled"
+        if state_name == NoteForm.waiting_for_note.state
+        else "comment_cancelled"
+    )
+    await message.answer(translate(locale, message_key))
 
 
 @router.message(
@@ -350,6 +468,32 @@ async def save_comment(message: Message, state: FSMContext, database: Database) 
     await message.answer(
         translate(locale, "comment_saved" if updated else "rating_not_found")
     )
+
+
+@router.message(
+    NoteForm.waiting_for_note,
+    F.text & ~F.text.startswith("/") & ~F.text.in_(_MENU_BUTTON_LABELS),
+)
+async def save_note(message: Message, state: FSMContext, database: Database) -> None:
+    locale = get_locale(message.from_user.language_code)
+    note = (message.text or "").strip()
+    if not note:
+        await message.answer(translate(locale, "comment_empty"))
+        return
+    if len(note) > COMMENT_LIMIT:
+        await message.answer(
+            translate(
+                locale,
+                "comment_too_long",
+                length=len(note),
+                limit=COMMENT_LIMIT,
+            )
+        )
+        return
+    today = await _local_today(database, message.from_user.id)
+    await database.append_daily_note(message.from_user.id, today, note)
+    await state.clear()
+    await message.answer(translate(locale, "note_saved"))
 
 
 @router.message(Command("timezone"))
@@ -421,13 +565,21 @@ async def _history_text(
         f"{_comparison_line(translate(locale, 'this_week_vs_last'), weekly, locale)}\n\n"
         f"{_comparison_line(translate(locale, 'this_month_vs_last'), monthly, locale)}"
     )
+    recent_by_date: dict[date, list[str]] = {}
     recent = await database.get_recent_ratings(user_id, int(metric["id"]))
-    if recent:
+    for row in recent:
+        rated_for = date.fromisoformat(row["rated_for"])
+        recent_by_date.setdefault(rated_for, []).append(str(row["score"]))
+
+    recent_notes = await database.get_recent_daily_notes(user_id)
+    for row in recent_notes:
+        note_for = date.fromisoformat(row["note_for"])
+        recent_by_date.setdefault(note_for, []).append(str(row["note"]))
+
+    if recent_by_date:
         entries = [
-            f"  {date.fromisoformat(row['rated_for']):%d.%m.%Y}: "
-            f"{row['score']}/{metric['max_score']}"
-            + (f" — {row['comment']}" if row["comment"] else "")
-            for row in recent
+            f"  {rated_for:%d.%m.%Y}: {' — '.join(recent_by_date[rated_for])}"
+            for rated_for in sorted(recent_by_date, reverse=True)[:5]
         ]
         text += f"\n\n{translate(locale, 'recent_ratings')}\n" + "\n".join(entries)
     return f"{metric_name(metric, locale)}\n\n{text}"
@@ -532,23 +684,36 @@ async def chart_for_metric(callback: CallbackQuery, database: Database) -> None:
 
 @router.message(F.text.in_(_MENU_BUTTON_LABELS))
 async def handle_menu_button(
-    message: Message, database: Database
+    message: Message, database: Database, state: FSMContext
 ) -> None:
     locale = get_locale(message.from_user.language_code)
     text = message.text
 
-    if text == translate(locale, "day_today") or text == translate(
-        locale, "day_yesterday"
-    ):
+    day_offset = next(
+        (
+            offset
+            for offset, key in enumerate(("day_today", "day_yesterday"))
+            if text in _day_button_labels(locale, key)
+        ),
+        None,
+    )
+    if day_offset is not None:
         await database.ensure_user(message.from_user.id)
-        offset = 0 if text == translate(locale, "day_today") else 1
         rated_for = await _local_today(database, message.from_user.id) - timedelta(
-            days=offset
+            days=day_offset
         )
         await _send_rating_for_date(
             message, database, message.from_user.id, rated_for, locale
         )
-    elif text == translate(locale, "more_commands"):
+    elif text in _NOTE_BUTTON_LABELS:
+        await database.ensure_user(message.from_user.id)
+        today = await _local_today(database, message.from_user.id)
+        current_note = await database.get_daily_note(message.from_user.id, today)
+        await state.set_state(NoteForm.waiting_for_note)
+        await message.answer(
+            _note_prompt(locale, "note_prompt", current_note)
+        )
+    elif text in _MORE_BUTTON_LABELS:
         await message.answer(
             translate(locale, "menu_prompt"),
             reply_markup=_commands_keyboard(locale),
@@ -557,6 +722,15 @@ async def handle_menu_button(
         await history(message, database)
     elif text == translate(locale, "menu_chart"):
         await chart(message, database)
+    elif text == translate(locale, "menu_delete_note"):
+        notes = await database.get_daily_notes(message.from_user.id)
+        if not notes:
+            await message.answer(translate(locale, "no_notes_to_delete"))
+        else:
+            await message.answer(
+                translate(locale, "choose_note_to_delete"),
+                reply_markup=_delete_note_keyboard(notes, locale),
+            )
     elif text == translate(locale, "menu_timezone"):
         await _show_timezone_prompt(message, database, locale)
     elif text == translate(locale, "menu_help"):
@@ -564,5 +738,7 @@ async def handle_menu_button(
     elif text == translate(locale, "menu_back"):
         await message.answer(
             translate(locale, "rate_prompt"),
-            reply_markup=_day_keyboard(locale),
+            reply_markup=await _day_keyboard_for_user(
+                database, message.from_user.id, locale
+            ),
         )

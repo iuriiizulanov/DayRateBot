@@ -5,20 +5,22 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "en": {
         "day_today": "📅 Today",
         "day_yesterday": "🗓 Yesterday",
-        "more_commands": "☰ Other commands",
+        "note_today": "📝 Notes",
+        "more_commands": "☰ More",
         "menu_prompt": "Choose a command:",
         "menu_history": "📚 History",
         "menu_chart": "📈 Chart",
+        "menu_delete_note": "🗑 Delete note",
         "menu_timezone": "🌍 Timezone",
         "menu_help": "ℹ️ Help",
         "menu_back": "↩️ Back",
         "help_scale": (
             "How to rate your day (1–10):\n"
-            "1–2 — very difficult day\n"
-            "3–4 — a rather bad day\n"
-            "5–6 — mixed or okay day\n"
-            "7–8 — a good day\n"
-            "9–10 — an excellent day\n\n"
+            "🔴 1–2 — very difficult day\n"
+            "🔴 3–4 — a rather bad day\n"
+            "🟡 5–6 — mixed or okay day\n"
+            "🟢 7–8 — a good day\n"
+            "🟢 9–10 — an excellent day\n\n"
             "Use the score that best reflects how you personally feel. "
             "There are no right or wrong answers."
         ),
@@ -54,8 +56,9 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "rating_saved": "Rating saved.",
         "saved_rating": "{status} {metric} for {date}: {score}/{maximum}.",
         "rating_not_found": "Rating not found.",
+        "current_note": "Current note:\n{note}",
         "comment_prompt": (
-            "Send your comment in one message (up to {limit} characters). "
+            "Send the text to append to the current note (up to {limit} characters). "
             "Use /cancel to cancel."
         ),
         "comment_empty": "The comment cannot be empty. Send text or /cancel.",
@@ -64,6 +67,17 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         "comment_saved": "Comment saved.",
         "comment_cancelled": "Adding a comment was cancelled.",
+        "note_prompt": (
+            "Send text to append to today's note (up to {limit} characters). "
+            "Use /cancel to cancel."
+        ),
+        "note_saved": "Today's note saved.",
+        "note_cancelled": "Adding a note was cancelled.",
+        "choose_note_to_delete": "Choose the day whose note you want to delete:",
+        "delete_note_date": "🗑 {date}",
+        "note_deleted": "The note was deleted.",
+        "note_not_found": "There is no note for that day.",
+        "no_notes_to_delete": "There are no notes to delete.",
         "timezone_current": "Your current timezone is {timezone}.",
         "timezone_prompt": (
             "Enter an IANA timezone, for example: /timezone Europe/London"
@@ -98,20 +112,22 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "ru": {
         "day_today": "📅 Сегодня",
         "day_yesterday": "🗓 Вчера",
-        "more_commands": "☰ Другие команды",
+        "note_today": "📝 Заметки",
+        "more_commands": "☰ Еще",
         "menu_prompt": "Выберите команду:",
         "menu_history": "📚 История",
         "menu_chart": "📈 График",
+        "menu_delete_note": "🗑 Удалить заметку",
         "menu_timezone": "🌍 Часовой пояс",
         "menu_help": "ℹ️ Помощь",
         "menu_back": "↩️ Назад",
         "help_scale": (
             "Как оценить свой день по шкале от 1 до 10:\n"
-            "1–2 — очень тяжёлый день\n"
-            "3–4 — скорее плохой день\n"
-            "5–6 — неоднозначный или обычный день\n"
-            "7–8 — хороший день\n"
-            "9–10 — отличный день\n\n"
+            "🔴 1–2 — очень тяжёлый день\n"
+            "🔴 3–4 — скорее плохой день\n"
+            "🟡 5–6 — неоднозначный или обычный день\n"
+            "🟢 7–8 — хороший день\n"
+            "🟢 9–10 — отличный день\n\n"
             "Выбирайте оценку по своим ощущениям. Правильных или неправильных "
             "ответов нет."
         ),
@@ -148,9 +164,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "rating_saved": "Оценка сохранена.",
         "saved_rating": "{status} {metric} за {date}: {score}/{maximum}.",
         "rating_not_found": "Оценка не найдена.",
+        "current_note": "Текущая заметка:\n{note}",
         "comment_prompt": (
-            "Отправьте комментарий одним сообщением (до {limit} символов). "
-            "Для отмены используйте /cancel."
+            "Отправьте текст, который нужно добавить к текущей заметке "
+            "(до {limit} символов). Для отмены используйте /cancel."
         ),
         "comment_empty": "Комментарий не должен быть пустым. Отправьте текст или /cancel.",
         "comment_too_long": (
@@ -158,6 +175,17 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         "comment_saved": "Комментарий сохранён.",
         "comment_cancelled": "Добавление комментария отменено.",
+        "note_prompt": (
+            "Отправьте текст, который нужно дописать к заметке за сегодня "
+            "(до {limit} символов). Для отмены используйте /cancel."
+        ),
+        "note_saved": "Заметка за сегодня сохранена.",
+        "note_cancelled": "Добавление заметки отменено.",
+        "choose_note_to_delete": "Выберите день, заметку за который нужно удалить:",
+        "delete_note_date": "🗑 {date}",
+        "note_deleted": "Заметка удалена.",
+        "note_not_found": "За этот день заметки нет.",
+        "no_notes_to_delete": "Нет заметок для удаления.",
         "timezone_current": "Текущий часовой пояс: {timezone}.",
         "timezone_prompt": (
             "Укажите IANA-имя, например: /timezone Europe/Moscow"

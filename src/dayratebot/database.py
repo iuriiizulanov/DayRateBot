@@ -45,12 +45,34 @@ class Database:
                 UNIQUE (user_id, metric_id, rated_for)
             );
 
+            CREATE TABLE IF NOT EXISTS daily_notes (
+                user_id INTEGER NOT NULL REFERENCES users(telegram_id) ON DELETE CASCADE,
+                note_for TEXT NOT NULL,
+                note TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, note_for)
+            );
+
             CREATE INDEX IF NOT EXISTS ratings_user_date_idx
                 ON ratings (user_id, rated_for);
 
             INSERT OR IGNORE INTO metrics (code, name, min_score, max_score)
             VALUES ('day_rating', 'Оценка дня', 1, 10);
             """
+        )
+        await self.connection.execute(
+            """
+            INSERT INTO daily_notes (user_id, note_for, note, updated_at)
+            SELECT user_id, rated_for, comment, updated_at FROM ratings
+            WHERE comment IS NOT NULL AND comment != ''
+            ON CONFLICT (user_id, note_for) DO UPDATE SET
+                note = excluded.note,
+                updated_at = excluded.updated_at
+            WHERE excluded.updated_at >= daily_notes.updated_at
+            """
+        )
+        await self.connection.execute(
+            "UPDATE ratings SET comment = NULL WHERE comment IS NOT NULL"
         )
         await self.connection.commit()
 
@@ -99,8 +121,16 @@ class Database:
         self, user_id: int, metric_id: int, rated_for: date
     ) -> aiosqlite.Row | None:
         cursor = await self._db().execute(
-            "SELECT id, score, comment FROM ratings "
-            "WHERE user_id = ? AND metric_id = ? AND rated_for = ?",
+            """
+            SELECT ratings.id, ratings.score,
+                   COALESCE(daily_notes.note, ratings.comment) AS comment
+            FROM ratings
+            LEFT JOIN daily_notes
+                ON daily_notes.user_id = ratings.user_id
+                AND daily_notes.note_for = ratings.rated_for
+            WHERE ratings.user_id = ? AND ratings.metric_id = ?
+                AND ratings.rated_for = ?
+            """,
             (user_id, metric_id, rated_for.isoformat()),
         )
         return await cursor.fetchone()
@@ -119,25 +149,72 @@ class Database:
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT (user_id, metric_id, rated_for) DO UPDATE SET
                 score = excluded.score,
-                comment = COALESCE(excluded.comment, ratings.comment),
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (user_id, metric_id, rated_for.isoformat(), score, comment),
+            (user_id, metric_id, rated_for.isoformat(), score, None),
         )
         await self._db().commit()
+        if comment is not None:
+            await self.append_daily_note(user_id, rated_for, comment)
 
     async def update_comment(self, rating_id: int, user_id: int, comment: str) -> bool:
         cursor = await self._db().execute(
-            "UPDATE ratings SET comment = ?, updated_at = CURRENT_TIMESTAMP "
-            "WHERE id = ? AND user_id = ?",
-            (comment, rating_id, user_id),
+            "SELECT rated_for FROM ratings WHERE id = ? AND user_id = ?",
+            (rating_id, user_id),
+        )
+        rating = await cursor.fetchone()
+        if rating is None:
+            return False
+        await self.append_daily_note(
+            user_id, date.fromisoformat(rating["rated_for"]), comment
+        )
+        return True
+
+    async def get_daily_note(self, user_id: int, note_for: date) -> str | None:
+        cursor = await self._db().execute(
+            "SELECT note FROM daily_notes WHERE user_id = ? AND note_for = ?",
+            (user_id, note_for.isoformat()),
+        )
+        row = await cursor.fetchone()
+        return str(row["note"]) if row is not None else None
+
+    async def delete_daily_note(self, user_id: int, note_for: date) -> bool:
+        cursor = await self._db().execute(
+            "DELETE FROM daily_notes WHERE user_id = ? AND note_for = ?",
+            (user_id, note_for.isoformat()),
         )
         await self._db().commit()
         return cursor.rowcount == 1
 
+    async def save_daily_note(self, user_id: int, note_for: date, note: str) -> None:
+        await self._db().execute(
+            """
+            INSERT INTO daily_notes (user_id, note_for, note)
+            VALUES (?, ?, ?)
+            ON CONFLICT (user_id, note_for) DO UPDATE SET
+                note = excluded.note,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (user_id, note_for.isoformat(), note),
+        )
+        await self._db().commit()
+
+    async def append_daily_note(self, user_id: int, note_for: date, note: str) -> None:
+        await self._db().execute(
+            """
+            INSERT INTO daily_notes (user_id, note_for, note)
+            VALUES (?, ?, ?)
+            ON CONFLICT (user_id, note_for) DO UPDATE SET
+                note = daily_notes.note || char(10) || excluded.note,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (user_id, note_for.isoformat(), note),
+        )
+        await self._db().commit()
+
     async def get_rating_owner(self, rating_id: int, user_id: int) -> Any | None:
         cursor = await self._db().execute(
-            "SELECT id FROM ratings WHERE id = ? AND user_id = ?",
+            "SELECT id, rated_for FROM ratings WHERE id = ? AND user_id = ?",
             (rating_id, user_id),
         )
         return await cursor.fetchone()
@@ -166,5 +243,29 @@ class Database:
             ORDER BY rated_for DESC LIMIT ?
             """,
             (user_id, metric_id, limit),
+        )
+        return list(await cursor.fetchall())
+
+    async def get_recent_daily_notes(
+        self, user_id: int, limit: int = 5
+    ) -> list[aiosqlite.Row]:
+        cursor = await self._db().execute(
+            """
+            SELECT note_for, note FROM daily_notes
+            WHERE user_id = ?
+            ORDER BY note_for DESC LIMIT ?
+            """,
+            (user_id, limit),
+        )
+        return list(await cursor.fetchall())
+
+    async def get_daily_notes(self, user_id: int) -> list[aiosqlite.Row]:
+        cursor = await self._db().execute(
+            """
+            SELECT note_for, note FROM daily_notes
+            WHERE user_id = ?
+            ORDER BY note_for DESC
+            """,
+            (user_id,),
         )
         return list(await cursor.fetchall())

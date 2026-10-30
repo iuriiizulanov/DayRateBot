@@ -5,6 +5,7 @@ from dayratebot.i18n import (
     metric_name,
     translate,
 )
+from dayratebot.handlers import _note_prompt
 
 
 def test_russian_telegram_language_uses_russian_catalog() -> None:
@@ -55,6 +56,29 @@ def test_help_explains_rating_scale_in_both_languages() -> None:
 
     assert "ответов нет" in russian_help
     assert "no right or wrong answers" in english_help
+    for color in ("🔴", "🟡", "🟢"):
+        assert color in english_help
+        assert color in russian_help
+    for colored_range in ("🔴 1–2", "🔴 3–4", "🟡 5–6", "🟢 7–8", "🟢 9–10"):
+        assert colored_range in english_help
+        assert colored_range in russian_help
+
+
+def test_main_menu_button_labels_are_updated() -> None:
+    assert translate("ru", "note_today") == "📝 Заметки"
+    assert translate("ru", "more_commands") == "☰ Еще"
+    assert translate("en", "note_today") == "📝 Notes"
+    assert translate("en", "more_commands") == "☰ More"
+
+
+def test_note_prompts_include_existing_note_for_editing() -> None:
+    assert "Текущая заметка:\nУже был в парке" in _note_prompt(
+        "ru", "note_prompt", "Уже был в парке"
+    )
+    assert "Current note:\nWent to the park" in _note_prompt(
+        "en", "comment_prompt", "Went to the park"
+    )
+    assert "Текущая заметка" not in _note_prompt("ru", "note_prompt", None)
 
 
 def test_welcome_lists_help_command() -> None:
